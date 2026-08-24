@@ -1,0 +1,62 @@
+name: Build KB3HJC v0.4.1 GUI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout exact patched source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Verify source base
+        run: |
+          echo "Current commit:"
+          git log -1 --oneline
+          echo "CQ scheduler diff from BG7NZL v0.4:"
+          git diff 409386e -- src/ft8/cq_scheduler.c
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git cmake ninja-build python3 \
+            rsync unzip bc cpio file wget curl patch
+
+      - name: Clone Buildroot
+        run: |
+          git clone --recurse-submodules \
+            https://github.com/gdyuldin/AetherX6100Buildroot.git \
+            "$GITHUB_WORKSPACE/../AetherX6100Buildroot"
+
+      - name: Configure Buildroot
+        working-directory: ../AetherX6100Buildroot
+        run: ./br_config.sh
+
+      - name: Build toolchain
+        working-directory: ../AetherX6100Buildroot/build
+        run: make -j"$(nproc)"
+
+      - name: Build exact v0.4.1 GUI
+        working-directory: buildroot
+        run: ./build.sh
+
+      - name: Verify GUI
+        run: |
+          file buildroot/x6100_gui
+          ls -lh buildroot/x6100_gui
+          strings buildroot/x6100_gui | grep -E \
+            'Auto Mode:|Force QSO|Page: 1:4|Even|Odd' || true
+
+      - name: Upload GUI only
+        uses: actions/upload-artifact@v4
+        with:
+          name: KB3HJC-v0.4.1-x6100_gui
+          path: buildroot/x6100_gui
+          if-no-files-found: error
