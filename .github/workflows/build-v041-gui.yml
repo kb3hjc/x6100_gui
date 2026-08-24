@@ -38,6 +38,13 @@ jobs:
       - name: Configure Buildroot
         working-directory: ../AetherX6100Buildroot
         run: ./br_config.sh
+      - name: Seed Buildroot download cache
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/../AetherX6100Buildroot/buildroot/dl/autoconf"
+          curl -L --retry 5 --retry-delay 5 \
+            https://ftp.gnu.org/gnu/autoconf/autoconf-2.71.tar.xz \
+            -o "$GITHUB_WORKSPACE/../AetherX6100Buildroot/buildroot/dl/autoconf/autoconf-2.71.tar.xz"
+          ls -lh "$GITHUB_WORKSPACE/../AetherX6100Buildroot/buildroot/dl/autoconf/autoconf-2.71.tar.xz"
 
       - name: Build toolchain
         working-directory: ../AetherX6100Buildroot/build
