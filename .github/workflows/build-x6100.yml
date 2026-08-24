@@ -1,0 +1,51 @@
+name: Build X6100 CQ POTA fix
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout patched GUI
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git cmake ninja-build python3 rsync unzip bc cpio file wget curl patch
+
+      - name: Clone X6100 Buildroot
+        run: |
+          git clone --recurse-submodules https://github.com/gdyuldin/AetherX6100Buildroot.git "$GITHUB_WORKSPACE/../AetherX6100Buildroot"
+
+      - name: Configure Buildroot
+        working-directory: ../AetherX6100Buildroot
+        run: ./br_config.sh
+
+      - name: Build Buildroot toolchain/rootfs
+        working-directory: ../AetherX6100Buildroot/build
+        run: make -j2
+
+      - name: Build X6100 GUI
+        working-directory: buildroot
+        run: ./build.sh
+
+      - name: Collect outputs
+        shell: bash
+        run: |
+          mkdir -p artifact
+          find . -type f \( -name 'x6100_gui' -o -name '*.img' -o -name '*.img.zip' \) -exec cp -v {} artifact/ \; || true
+          find "$GITHUB_WORKSPACE/../AetherX6100Buildroot" -type f \( -name 'sdcard*.img' -o -name 'sdcard*.img.zip' \) -exec cp -v {} artifact/ \; || true
+          ls -lah artifact
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x6100-cq-pota-build
+          path: artifact/
+          if-no-files-found: error
