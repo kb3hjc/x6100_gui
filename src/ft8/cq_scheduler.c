@@ -32,9 +32,5 @@ void cq_make_message(const char *callsign,
     if (rc != FTX_MESSAGE_RC_OK) {
         LV_LOG_USER("Error: %d while encoding message: '%s'", rc, buf);
     }
-    rc = ftx_message_decode(&msg, NULL, buf);
-    if (rc != FTX_MESSAGE_RC_OK) {
-        LV_LOG_USER("Error: %d while decoding message: '%s'", rc, buf);
-    }
     strcpy(out, buf);
 }
