@@ -55,7 +55,7 @@ jobs:
           path: |
             ${{ github.workspace }}/../AetherX6100Buildroot/build/host
             ${{ github.workspace }}/../AetherX6100Buildroot/build/staging
-          key: x6100-toolchain-${{ runner.os }}-${{ hashFiles('../AetherX6100Buildroot/.gitmodules') }}-v1
+          key: x6100-toolchain-${{ runner.os }}-aether-v1-v1
           restore-keys: |
             x6100-toolchain-${{ runner.os }}-
 
@@ -72,6 +72,30 @@ jobs:
       - name: Build X6100 GUI
         working-directory: buildroot
         run: ./build.sh
+
+      - name: Install custom WebGUI files into image
+        run: |
+          ROOTFS="$GITHUB_WORKSPACE/../AetherX6100Buildroot/build/target"
+
+          echo "Using target rootfs: $ROOTFS"
+
+          install -D -m 755 \
+            x6100_custom/webserver/x6100_webserver_plus \
+            "$ROOTFS/usr/bin/x6100_webserver_plus"
+
+          install -D -m 644 \
+            x6100_custom/webserver/files.html \
+            "$ROOTFS/usr/lib/python3.11/site-packages/x6100_webserver/views/files.html"
+
+          install -D -m 755 \
+            x6100_custom/webserver/S96webserver \
+            "$ROOTFS/etc/init.d/S96webserver"
+
+          echo "Installed custom WebGUI files:"
+          ls -l \
+            "$ROOTFS/usr/bin/x6100_webserver_plus" \
+            "$ROOTFS/usr/lib/python3.11/site-packages/x6100_webserver/views/files.html" \
+            "$ROOTFS/etc/init.d/S96webserver"
 
       - name: Collect outputs
         shell: bash
