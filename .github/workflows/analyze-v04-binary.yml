@@ -1,0 +1,45 @@
+name: Analyze BG7NZL v0.4 binary
+
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ARM binutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils-arm-linux-gnueabihf
+
+      - name: Verify binary
+        run: |
+          md5sum x6100_custom/bin/x6100_gui-bg7nzl-v04-good
+          file x6100_custom/bin/x6100_gui-bg7nzl-v04-good
+
+      - name: Find FT8 decode call sites
+        run: |
+          BIN=x6100_custom/bin/x6100_gui-bg7nzl-v04-good
+
+          arm-linux-gnueabihf-objdump -d "$BIN" > /tmp/gui.dis
+
+          echo "=== ftx_message_decode PLT ==="
+          grep -n -A5 -B2 '<ftx_message_decode@plt>' /tmp/gui.dis || true
+
+          echo
+          echo "=== all calls to ftx_message_decode ==="
+          grep -n -B20 -A25 'bl.*ftx_message_decode@plt' /tmp/gui.dis || true
+
+          echo
+          echo "=== calls near encode/decode/strcpy sequence ==="
+          grep -n -B35 -A45 'bl.*ftx_message_encode@plt' /tmp/gui.dis || true
+
+      - name: Upload disassembly
+        uses: actions/upload-artifact@v4
+        with:
+          name: bg7nzl-v04-disassembly
+          path: /tmp/gui.dis
