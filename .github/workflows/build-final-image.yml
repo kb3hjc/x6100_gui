@@ -1,0 +1,161 @@
+name: Build KB3HJC X6100 v0.4.1 Image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout tested files
+        uses: actions/checkout@v4
+
+      - name: Verify tested custom files
+        run: |
+          set -euxo pipefail
+
+          echo "Checking tested CQ-POTA GUI binary..."
+          echo "75515e79afc9a87b4a68999794ada8b2  x6100_custom/bin/x6100_gui" \
+            | md5sum -c -
+
+          file x6100_custom/bin/x6100_gui
+          ls -lh x6100_custom/bin/x6100_gui
+
+          echo "Checking WebGUI files..."
+          test -f x6100_custom/webserver/x6100_webserver_plus
+          test -f x6100_custom/webserver/files.html
+          test -f x6100_custom/webserver/S96webserver
+
+          grep -q 'x6100_webserver_plus' \
+            x6100_custom/webserver/S96webserver
+
+      - name: Download known-good BG7NZL v0.4 image
+        run: |
+          curl -fL \
+            --retry 5 \
+            --retry-delay 5 \
+            -o sdcard.img \
+            https://github.com/kb3hjc/x6100_gui/releases/download/base-bg7nzl-v0.4/sdcard.img
+
+          ls -lh sdcard.img
+
+      - name: Verify known-good base image
+        run: |
+          echo "9c0d6285af2301ff00c0acd952edbf693308c2d8eb1f0254d3204bb885d6b9a5  sdcard.img" \
+            | sha256sum -c -
+
+      - name: Create working image
+        run: |
+          cp sdcard.img KB3HJC-X6100-v0.4.1.img
+
+      - name: Patch known-good image
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          IMG="$GITHUB_WORKSPACE/KB3HJC-X6100-v0.4.1.img"
+          MNT="$GITHUB_WORKSPACE/x6100-root"
+
+          mkdir -p "$MNT"
+
+          LOOP=$(sudo losetup --find --show --partscan "$IMG")
+          echo "Loop device: $LOOP"
+
+          cleanup() {
+            sudo umount "$MNT" 2>/dev/null || true
+            sudo losetup -d "$LOOP" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          lsblk "$LOOP"
+
+          sudo mount "${LOOP}p2" "$MNT"
+
+          echo "Verifying original BG7NZL GUI inside base image..."
+          ORIGINAL_MD5=$(sudo md5sum "$MNT/usr/sbin/x6100_gui" | awk '{print $1}')
+          echo "Original GUI MD5: $ORIGINAL_MD5"
+
+          test "$ORIGINAL_MD5" = \
+            "8af15b3fc6895fb959d8b9fe75d1c1cf"
+
+          echo "Installing tested CQ-POTA patched GUI..."
+          sudo install -m 755 \
+            x6100_custom/bin/x6100_gui \
+            "$MNT/usr/sbin/x6100_gui"
+
+          echo "Installing tested WebGUI..."
+          sudo install -D -m 755 \
+            x6100_custom/webserver/x6100_webserver_plus \
+            "$MNT/usr/bin/x6100_webserver_plus"
+
+          sudo install -D -m 644 \
+            x6100_custom/webserver/files.html \
+            "$MNT/usr/lib/python3.11/site-packages/x6100_webserver/views/files.html"
+
+          sudo install -D -m 755 \
+            x6100_custom/webserver/S96webserver \
+            "$MNT/etc/init.d/S96webserver"
+
+          echo "Verifying patched GUI..."
+          PATCHED_MD5=$(sudo md5sum "$MNT/usr/sbin/x6100_gui" | awk '{print $1}')
+          echo "Patched GUI MD5: $PATCHED_MD5"
+
+          test "$PATCHED_MD5" = \
+            "75515e79afc9a87b4a68999794ada8b2"
+
+          echo "Verifying WebGUI startup..."
+          sudo grep -q 'x6100_webserver_plus' \
+            "$MNT/etc/init.d/S96webserver"
+
+          sudo ls -lh \
+            "$MNT/usr/sbin/x6100_gui" \
+            "$MNT/usr/bin/x6100_webserver_plus" \
+            "$MNT/usr/lib/python3.11/site-packages/x6100_webserver/views/files.html" \
+            "$MNT/etc/init.d/S96webserver"
+
+          sync
+          sudo umount "$MNT"
+          sudo losetup -d "$LOOP"
+          trap - EXIT
+
+      - name: Check filesystem
+        run: |
+          set -euxo pipefail
+
+          LOOP=$(sudo losetup --find --show --partscan \
+            KB3HJC-X6100-v0.4.1.img)
+
+          sudo e2fsck -fn "${LOOP}p2"
+
+          sudo losetup -d "$LOOP"
+
+      - name: Create checksums
+        run: |
+          sha256sum KB3HJC-X6100-v0.4.1.img \
+            > KB3HJC-X6100-v0.4.1.img.sha256
+
+          md5sum KB3HJC-X6100-v0.4.1.img \
+            > KB3HJC-X6100-v0.4.1.img.md5
+
+          cat KB3HJC-X6100-v0.4.1.img.sha256
+          cat KB3HJC-X6100-v0.4.1.img.md5
+
+      - name: Compress final image
+        run: |
+          zip -9 \
+            KB3HJC-X6100-v0.4.1.img.zip \
+            KB3HJC-X6100-v0.4.1.img
+
+          ls -lh KB3HJC-X6100-v0.4.1.img*
+
+      - name: Upload final image
+        uses: actions/upload-artifact@v4
+        with:
+          name: KB3HJC-X6100-v0.4.1-FINAL
+          path: |
+            KB3HJC-X6100-v0.4.1.img.zip
+            KB3HJC-X6100-v0.4.1.img.sha256
+            KB3HJC-X6100-v0.4.1.img.md5
+          if-no-files-found: error
