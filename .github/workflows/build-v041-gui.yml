@@ -38,6 +38,13 @@ jobs:
       - name: Configure Buildroot
         working-directory: ../AetherX6100Buildroot
         run: ./br_config.sh
+      - name: Restore Buildroot cache
+        id: buildroot-cache
+        uses: actions/cache@v4
+        with:
+          path: ../AetherX6100Buildroot/build
+          key: aether-x6100-buildroot-v1-${{ hashFiles('../AetherX6100Buildroot/configs/**') }}
+
       - name: Seed Buildroot download cache
         run: |
           mkdir -p "$GITHUB_WORKSPACE/../AetherX6100Buildroot/buildroot/dl/autoconf"
@@ -47,6 +54,7 @@ jobs:
           ls -lh "$GITHUB_WORKSPACE/../AetherX6100Buildroot/buildroot/dl/autoconf/autoconf-2.71.tar.xz"
 
       - name: Build toolchain
+        if: steps.buildroot-cache.outputs.cache-hit != 'true'
         working-directory: ../AetherX6100Buildroot/build
         run: make -j"$(nproc)"
 
