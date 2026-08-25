@@ -54,16 +54,26 @@ jobs:
         working-directory: buildroot
         run: ./build.sh
 
-      - name: Verify GUI
+      - name: Collect and verify GUI
         run: |
-          file buildroot/x6100_gui
-          ls -lh buildroot/x6100_gui
-          strings buildroot/x6100_gui | grep -E \
+          GUI="$(find buildroot -type f -name x6100_gui | head -1)"
+
+          echo "Found GUI at: $GUI"
+          test -n "$GUI"
+          test -f "$GUI"
+
+          mkdir -p artifact
+          cp "$GUI" artifact/x6100_gui
+
+          file artifact/x6100_gui
+          ls -lh artifact/x6100_gui
+
+          strings artifact/x6100_gui | grep -E \
             'Auto Mode:|Force QSO|Page: 1:4|Even|Odd' || true
 
-      - name: Upload GUI only
+      - name: Upload GUI
         uses: actions/upload-artifact@v4
         with:
           name: KB3HJC-v0.4.1-x6100_gui
-          path: buildroot/x6100_gui
+          path: artifact/x6100_gui
           if-no-files-found: error
