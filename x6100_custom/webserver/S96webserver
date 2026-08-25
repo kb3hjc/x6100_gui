@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Starts webserver.
+#
+
+DAEMON="x6100_webserver_plus"
+PIDFILE="/var/run/$DAEMON.pid"
+ARGS="--db /mnt/params.db --host 0.0.0.0 --port 80 --filebrowser-path /mnt/"
+
+start() {
+	printf "Starting $DAEMON: "
+	# Sleep for finishing migration
+	sleep 3
+	start-stop-daemon -S -b -q -m -p "$PIDFILE" -x "/usr/bin/$DAEMON" -- $ARGS
+	status=$?
+	if [ "$status" -eq 0 ]; then
+		echo "OK"
+	else
+		echo "FAIL"
+	fi
+	return "$status"
+}
+stop() {
+	printf 'Stopping %s: ' "$DAEMON"
+	start-stop-daemon -K -q -p "$PIDFILE"
+	status=$?
+	if [ "$status" -eq 0 ]; then
+		rm -f "$PIDFILE"
+		echo "OK"
+	else
+		echo "FAIL"
+	fi
+	return "$status"
+}
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart|reload)
+	restart
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?
+

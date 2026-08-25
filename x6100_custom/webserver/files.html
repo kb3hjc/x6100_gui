@@ -1,0 +1,40 @@
+% rebase('base.html', title='File browser')
+
+% mnt_line = next((line for line in open('/proc/mounts') if len(line.split()) >= 4 and line.split()[1] == '/mnt'), '')
+% mnt_opts = mnt_line.split()[3].split(',') if mnt_line else []
+% mnt_mode = 'RO' if 'ro' in mnt_opts else ('RW' if 'rw' in mnt_opts else 'UNKNOWN')
+
+<h3>DATA partition: {{mnt_mode}}</h3>
+
+% if mnt_mode == 'RO':
+<div style="padding:10px; border:2px solid #c00; margin-bottom:15px;">
+  <b>WARNING:</b> /mnt is read-only. Do not clear the FT8 log until the filesystem is repaired.
+</div>
+% end
+
+<div style="margin-bottom:15px;">
+  <a href="/files/ft_log.adi">Download FT8 Log</a>
+
+  <form method="post"
+        action="/api/clear_ft8_log"
+        style="display:inline; margin-left:15px;"
+        onsubmit="return confirm('Clear FT8 log? Make sure you downloaded it first. A backup will be created automatically.');">
+    <button type="submit">Clear FT8 Log</button>
+  </form>
+</div>
+
+<hr>
+
+% if has_parent:
+<i class="si-folder"></i> <a href="/files/{{!parent_path_url}}/">..</a><br/>
+% end
+
+% for item in dirs:
+<i class="si-folder"></i> <a href="/files/{{!item['path_url']}}/">{{item['name']}}</a><br/>
+% end
+
+% for item in files:
+<i class="si-file"></i>
+<a href="/view/{{!item['path_url']}}">{{item['name']}}</a>
+<a href="/files/{{!item['path_url']}}" title="download">[dl]</a><br/>
+% end

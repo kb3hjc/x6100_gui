@@ -1,0 +1,69 @@
+#!/usr/bin/python3
+
+import argparse
+import datetime
+import os
+import pathlib
+import bottle
+
+from x6100_webserver import apps, settings
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--db', default='/mnt/params.db')
+parser.add_argument('--host', default='0.0.0.0')
+parser.add_argument('--port', type=int, default=8081)
+parser.add_argument('--filebrowser-path', default='/mnt/')
+args = parser.parse_args()
+
+settings.DBFILE = args.db
+settings.FILEBROWSER_PATH = pathlib.Path(args.filebrowser_path)
+
+@apps.app.post('/api/clear_ft8_log')
+def clear_ft8_log():
+    mnt_mode = 'UNKNOWN'
+
+    with open('/proc/mounts') as f:
+        for line in f:
+            p = line.split()
+            if len(p) >= 4 and p[1] == '/mnt':
+                opts = p[3].split(',')
+                if 'ro' in opts:
+                    mnt_mode = 'RO'
+                elif 'rw' in opts:
+                    mnt_mode = 'RW'
+                break
+
+    if mnt_mode != 'RW':
+        bottle.response.status = 503
+        return 'ERROR: /mnt is not writable'
+
+    log = '/mnt/ft_log.adi'
+    backup_dir = '/mnt/backups'
+
+    os.makedirs(backup_dir, exist_ok=True)
+
+    if os.path.exists(log) and os.path.getsize(log) > 0:
+        stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+        backup = f'{backup_dir}/ft_log-{stamp}.adi'
+
+        with open(log, 'rb') as src:
+            data = src.read()
+
+        with open(backup, 'wb') as dst:
+            dst.write(data)
+            dst.flush()
+            os.fsync(dst.fileno())
+
+    with open(log, 'w') as f:
+        f.flush()
+        os.fsync(f.fileno())
+
+    os.sync()
+
+    bottle.redirect('/files/')
+
+apps.app.run(
+    host=args.host,
+    port=args.port,
+    quiet=False
+)
