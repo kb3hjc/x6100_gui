@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ../AetherX6100Buildroot/build
-          key: aether-x6100-buildroot-v1-${{ hashFiles('../AetherX6100Buildroot/configs/**') }}
+          key: aether-x6100-buildroot-v1
 
       - name: Seed Buildroot download cache
         run: |
